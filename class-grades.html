@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Grade Sandbox (JSON Edition)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 p-8">
+
+    <div class="max-w-2xl mx-auto bg-white p-8 rounded-2xl shadow-sm border border-gray-200">
+        <header class="mb-8">
+            <h1 class="text-2xl font-bold text-gray-900">Grade Predictor</h1>
+            <p class="text-sm text-gray-500">Upload your <code class="bg-gray-100 px-1 rounded">config.json</code> to generate the workspace.</p>
+        </header>
+
+        <input type="file" id="loader" accept=".json" class="mb-8 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer">
+
+        <div id="ui-root" class="space-y-6"></div>
+
+        <div class="mt-12 py-8 border-t border-gray-100 text-center">
+            <span class="text-xs font-bold uppercase tracking-widest text-gray-400">Current Prediction</span>
+            <div id="avg-display" class="text-7xl font-black text-gray-300 mt-2">--%</div>
+        </div>
+    </div>
+
+    <script>
+        let schema = [];
+
+        document.getElementById('loader').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                try {
+                    const data = JSON.parse(event.target.result);
+                    schema = data.categories;
+                    buildUI();
+                } catch (err) {
+                    alert("Invalid JSON file. Please check your syntax.");
+                }
+            };
+            reader.readAsText(file);
+        });
+
+        function buildUI() {
+            const root = document.getElementById('ui-root');
+            root.innerHTML = '';
+
+            schema.forEach((cat, idx) => {
+                const div = document.createElement('div');
+                div.className = "group";
+                div.innerHTML = `
+                    <div class="flex justify-between items-end mb-2">
+                        <label class="font-semibold text-gray-700">${cat.name}</label>
+                        <span class="text-xs font-medium text-gray-400">${cat.weight * 100}% of total</span>
+                    </div>
+                    <div class="grid grid-cols-5 gap-2">
+                        ${Array.from({ length: cat.count }).map((_, i) => `
+                            <input type="number" placeholder="0" 
+                                   data-cat="${idx}" 
+                                   class="grade-box w-full p-2 border border-gray-200 rounded-lg text-center focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition-all">
+                        `).join('')}
+                    </div>
+                `;
+                root.appendChild(div);
+            });
+
+            document.querySelectorAll('.grade-box').forEach(el => el.addEventListener('input', updateCalc));
+        }
+
+        function updateCalc() {
+            let weightedSum = 0;
+            let totalWeightUsed = 0;
+
+            schema.forEach((cat, idx) => {
+                const inputs = document.querySelectorAll(`input[data-cat="${idx}"]`);
+                let scores = [];
+                inputs.forEach(i => { if(i.value !== "") scores.push(parseFloat(i.value)); });
+
+                if (scores.length > 0) {
+                    if (cat.bonus == true) {
+                        weightedSum += scores.reduce( (a,b) => a + b ) * cat.weight;
+                    } else {
+                        const avg = scores.reduce((a, b) => a + b) / scores.length;
+                        weightedSum += (avg * cat.weight);
+                        totalWeightUsed += cat.weight;
+                    }
+                }
+            });
+
+            const display = document.getElementById('avg-display');
+            if (totalWeightUsed > 0) {
+                const result = (weightedSum / totalWeightUsed).toFixed(1);
+                display.innerText = result + '%';
+                display.className = `text-7xl font-black mt-2 ${result >= 90 ? 'text-emerald-500' : 'text-indigo-600'}`;
+            } else {
+                display.innerText = '--%';
+                display.className = "text-7xl font-black text-gray-300 mt-2";
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,9 @@
+{
+  "categories": [
+    { "name": "Exams", "weight": 0.60, "count": 4, "bonus": false },
+    { "name": "Skill Assessment", "weight": 0.05, "count": 1, "bonus": false },
+    { "name": "Homework Avg", "weight": 0.10, "count": 1, "bonus": false },
+    { "name": "Bonus", "weight": 0.15, "count": 1, "bonus": true },
+    { "name": "Final Exam", "weight": 0.25, "count": 1, "bonus": false }
+  ]
+}
