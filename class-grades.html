@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Grade Sandbox (JSON Edition)</title>
+    <title>Grade Predictor</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-100 p-8">
@@ -10,7 +10,7 @@
     <div class="max-w-2xl mx-auto bg-white p-8 rounded-2xl shadow-sm border border-gray-200">
         <header class="mb-8">
             <h1 class="text-2xl font-bold text-gray-900">Grade Predictor</h1>
-            <p class="text-sm text-gray-500">Upload your <code class="bg-gray-100 px-1 rounded">config.json</code> to generate the workspace.</p>
+            <p class="text-sm text-gray-500">Upload your <code class="bg-gray-100 px-1 rounded">config.json</code> file to generate the workspace.</p>
         </header>
 
         <input type="file" id="loader" accept=".json" class="mb-8 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer">
@@ -57,7 +57,7 @@
                     </div>
                     <div class="grid grid-cols-5 gap-2">
                         ${Array.from({ length: cat.count }).map((_, i) => `
-                            <input type="number" placeholder="0" 
+                            <input type="text" 
                                    data-cat="${idx}" 
                                    class="grade-box w-full p-2 border border-gray-200 rounded-lg text-center focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition-all">
                         `).join('')}
