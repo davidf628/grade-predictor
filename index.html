@@ -7,18 +7,36 @@
 </head>
 <body class="bg-gray-100 p-8">
 
-    <div class="max-w-2xl mx-auto bg-white p-8 rounded-2xl shadow-sm border border-gray-200">
-        <header class="mb-8">
-            <h1 class="text-2xl font-bold text-gray-900">Grade Predictor</h1>
-            <p class="text-sm text-gray-500">Upload your <code class="bg-gray-100 px-1 rounded">config.json</code> file to generate the workspace.</p>
+    <div class="max-w-3xl mx-auto bg-white p-8 rounded-2xl shadow-sm border border-gray-200">
+        <header class="mb-6 flex flex-wrap justify-between items-center gap-4">
+            <div>
+                <h1 class="text-2xl font-bold text-gray-900">Grade Predictor</h1>
+                <p class="text-sm text-gray-500">Upload a <code class="bg-gray-100 px-1 rounded">config.json</code> or build categories manually below.</p>
+            </div>
+            <div class="flex gap-2">
+                <button onclick="exportJSON()" class="bg-gray-100 text-gray-700 hover:bg-gray-200 text-sm font-semibold px-4 py-2 rounded-lg transition-colors border border-gray-300">
+                    ↓ Export JSON
+                </button>
+                <button onclick="addCategory()" class="bg-indigo-600 text-white text-sm font-semibold px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors">
+                    + Add Category
+                </button>
+            </div>
         </header>
 
-        <input type="file" id="loader" accept=".json" class="mb-8 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer">
+        <!-- Weight Validation Alert Bar -->
+        <div id="weight-alert" class="mb-6 p-3 rounded-xl border text-sm font-medium transition-all hidden"></div>
 
+        <!-- Drag & Drop / Browse Area -->
+        <div id="drop-zone" class="mb-8 border-2 border-dashed border-gray-300 rounded-2xl p-6 text-center hover:border-indigo-400 transition-colors cursor-pointer bg-gray-50/50">
+            <p class="text-sm font-medium text-gray-600">Drag & drop your config.json here, or <span class="text-indigo-600 underline">browse</span></p>
+            <input type="file" id="loader" accept=".json" class="hidden">
+        </div>
+
+        <!-- Category Editor & Grade Inputs -->
         <div id="ui-root" class="space-y-6"></div>
 
         <div class="mt-12 py-8 border-t border-gray-100 text-center">
-            <span class="text-xs font-bold uppercase tracking-widest text-gray-400">Current Prediction</span>
+            <span class="text-xs font-bold uppercase tracking-widest text-gray-400">Current Overall Grade</span>
             <div id="avg-display" class="text-7xl font-black text-gray-300 mt-2">--%</div>
         </div>
     </div>
@@ -26,74 +44,223 @@
     <script>
         let schema = [];
 
-        document.getElementById('loader').addEventListener('change', async (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('loader');
 
+        dropZone.addEventListener('click', () => fileInput.click());
+
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('border-indigo-500', 'bg-indigo-50/50');
+        });
+
+        ['dragleave', 'drop'].forEach(event => {
+            dropZone.addEventListener(event, () => {
+                dropZone.classList.remove('border-indigo-500', 'bg-indigo-50/50');
+            });
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            const file = e.dataTransfer.files[0];
+            if (file) handleFile(file);
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) handleFile(file);
+        });
+
+        function handleFile(file) {
             const reader = new FileReader();
             reader.onload = (event) => {
                 try {
                     const data = JSON.parse(event.target.result);
-                    schema = data.categories;
+                    schema = data.categories || [];
                     buildUI();
                 } catch (err) {
-                    alert("Invalid JSON file. Please check your syntax.");
+                    alert("Invalid JSON file. Please check syntax.");
                 }
             };
             reader.readAsText(file);
-        });
+        }
+
+        function addCategory() {
+            schema.push({
+                name: "New Category",
+                weight: 0.10,
+                count: 3,
+                bonus: false,
+                scores: []
+            });
+            buildUI();
+        }
+
+        function removeCategory(index) {
+            schema.splice(index, 1);
+            buildUI();
+        }
+
+        function exportJSON() {
+            const cleanSchema = {
+                categories: schema.map(cat => ({
+                    name: cat.name,
+                    weight: cat.weight,
+                    count: cat.count,
+                    bonus: cat.bonus || false
+                }))
+            };
+
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(cleanSchema, null, 2));
+            const downloadAnchor = document.createElement('a');
+            downloadAnchor.setAttribute("href", dataStr);
+            downloadAnchor.setAttribute("download", "config.json");
+            document.body.appendChild(downloadAnchor);
+            downloadAnchor.click();
+            downloadAnchor.remove();
+        }
+
+        function validateWeights() {
+            let totalWeight = 0;
+
+            for (let i = 0; i < schema.length; i++) {
+                if (!schema[i].bonus) {
+                    totalWeight += schema[i].weight || 0;
+                }
+            }
+
+            // Using Math.round to avoid standard JavaScript floating point precision issues (e.g. 0.3 + 0.7 = 0.99999999)
+            const percentageSum = Math.round(totalWeight * 100);
+            const alertBox = document.getElementById('weight-alert');
+
+            if (schema.length === 0) {
+                alertBox.className = "hidden";
+                return;
+            }
+
+            if (percentageSum !== 100) {
+                alertBox.className = "mb-6 p-3 rounded-xl border text-sm font-medium transition-all bg-red-50 border-red-200 text-red-700 flex justify-between items-center";
+                alertBox.innerHTML = `
+                    <span>⚠️ <strong>Warning:</strong> Non-bonus category weights total <strong>${percentageSum}%</strong> (must equal 100%).</span>
+                `;
+            } else {
+                alertBox.className = "mb-6 p-3 rounded-xl border text-sm font-medium transition-all bg-emerald-50 border-emerald-200 text-emerald-700 flex justify-between items-center";
+                alertBox.innerHTML = `
+                    <span>✓ Category weights correctly total <strong>100%</strong>.</span>
+                `;
+            }
+        }
 
         function buildUI() {
             const root = document.getElementById('ui-root');
             root.innerHTML = '';
 
-            schema.forEach((cat, idx) => {
-                const div = document.createElement('div');
-                div.className = "group";
-                div.innerHTML = `
-                    <div class="flex justify-between items-end mb-2">
-                        <label class="font-semibold text-gray-700">${cat.name}</label>
-                        <span class="text-xs font-medium text-gray-400">${cat.weight * 100}% of total</span>
-                    </div>
-                    <div class="grid grid-cols-5 gap-2">
-                        ${Array.from({ length: cat.count }).map((_, i) => `
-                            <input type="text" 
-                                   data-cat="${idx}" 
-                                   class="grade-box w-full p-2 border border-gray-200 rounded-lg text-center focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition-all">
-                        `).join('')}
-                    </div>
-                `;
-                root.appendChild(div);
-            });
+            for (let idx = 0; idx < schema.length; idx++) {
+                const cat = schema[idx];
+                if (!cat.scores) cat.scores = Array(cat.count).fill("");
 
-            document.querySelectorAll('.grade-box').forEach(el => el.addEventListener('input', updateCalc));
+                const card = document.createElement('div');
+                card.className = "p-4 border border-gray-200 rounded-xl bg-gray-50/30 space-y-3";
+
+                card.innerHTML = `
+                    <div class="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 pb-3">
+                        <input type="text" value="${cat.name}" onchange="schema[${idx}].name = this.value; updateCalc();" 
+                               class="font-semibold text-gray-800 bg-transparent border-b border-transparent hover:border-gray-300 focus:border-indigo-500 outline-none px-1 py-0.5">
+                        
+                        <div class="flex items-center gap-4 text-xs font-medium text-gray-600">
+                            <label class="flex items-center gap-1">
+                                Weight: 
+                                <input type="number" step="0.01" value="${cat.weight}" onchange="schema[${idx}].weight = parseFloat(this.value) || 0; updateCalc();" 
+                                       class="w-16 p-1 border border-gray-200 rounded text-center bg-white">
+                            </label>
+
+                            <label class="flex items-center gap-1">
+                                Count: 
+                                <input type="number" min="1" max="20" value="${cat.count}" onchange="updateCount(${idx}, parseInt(this.value) || 1)" 
+                                       class="w-12 p-1 border border-gray-200 rounded text-center bg-white">
+                            </label>
+
+                            <label class="flex items-center gap-1 cursor-pointer">
+                                <input type="checkbox" ${cat.bonus ? 'checked' : ''} onchange="schema[${idx}].bonus = this.checked; updateCalc();" 
+                                       class="rounded text-indigo-600">
+                                Bonus
+                            </label>
+
+                            <button onclick="removeCategory(${idx})" class="text-red-500 hover:text-red-700 font-bold ml-2">✕</button>
+                        </div>
+                    </div>
+                    <div id="grid-${idx}" class="grid grid-cols-5 gap-2 pt-1"></div>
+                `;
+
+                root.appendChild(card);
+
+                const grid = document.getElementById(`grid-${idx}`);
+                for (let i = 0; i < cat.count; i++) {
+                    const input = document.createElement('input');
+                    input.type = 'number';
+                    input.placeholder = `Item ${i + 1}`;
+                    input.value = cat.scores[i] !== undefined ? cat.scores[i] : '';
+                    input.className = "grade-box w-full p-2 border border-gray-200 rounded-lg text-center focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition-all bg-white text-sm";
+                    
+                    input.addEventListener('input', (e) => {
+                        cat.scores[i] = e.target.value;
+                        updateCalc();
+                    });
+
+                    grid.appendChild(input);
+                }
+            }
+
+            updateCalc();
+        }
+
+        function updateCount(idx, newCount) {
+            schema[idx].count = newCount;
+            if (!schema[idx].scores) schema[idx].scores = [];
+            while (schema[idx].scores.length < newCount) schema[idx].scores.push("");
+            schema[idx].scores = schema[idx].scores.slice(0, newCount);
+            buildUI();
         }
 
         function updateCalc() {
-            let weightedSum = 0;
-            let totalWeightUsed = 0;
+            validateWeights();
 
-            schema.forEach((cat, idx) => {
-                const inputs = document.querySelectorAll(`input[data-cat="${idx}"]`);
-                let scores = [];
-                inputs.forEach(i => { if(i.value !== "") scores.push(parseFloat(i.value)); });
+            let totalWeightedPoints = 0;
+            let totalPossibleWeight = 0;
 
-                if (scores.length > 0) {
-                    if (cat.bonus == true) {
-                        weightedSum += scores.reduce( (a,b) => a + b ) * cat.weight;
-                    } else {
-                        const avg = scores.reduce((a, b) => a + b) / scores.length;
-                        weightedSum += (avg * cat.weight);
-                        totalWeightUsed += cat.weight;
+            for (let i = 0; i < schema.length; i++) {
+                const cat = schema[i];
+                let categorySum = 0;
+                let enteredCount = 0;
+
+                if (cat.scores) {
+                    for (let j = 0; j < cat.scores.length; j++) {
+                        const val = parseFloat(cat.scores[j]);
+                        if (!isNaN(val)) {
+                            categorySum += val;
+                            enteredCount++;
+                        }
                     }
                 }
-            });
+
+                if (enteredCount > 0) {
+                    if (cat.bonus) {
+                        const bonusAverage = categorySum / enteredCount;
+                        totalWeightedPoints += bonusAverage * cat.weight;
+                    } else {
+                        const categoryAverage = categorySum / enteredCount;
+                        totalWeightedPoints += categoryAverage * cat.weight;
+                        totalPossibleWeight += cat.weight;
+                    }
+                }
+            }
 
             const display = document.getElementById('avg-display');
-            if (totalWeightUsed > 0) {
-                const result = (weightedSum / totalWeightUsed).toFixed(1);
-                display.innerText = result + '%';
-                display.className = `text-7xl font-black mt-2 ${result >= 90 ? 'text-emerald-500' : 'text-indigo-600'}`;
+            
+            if (totalPossibleWeight > 0) {
+                const finalGrade = (totalWeightedPoints / totalPossibleWeight).toFixed(1);
+                display.innerText = finalGrade + '%';
+                display.className = `text-7xl font-black mt-2 ${finalGrade >= 90 ? 'text-emerald-500' : 'text-indigo-600'}`;
             } else {
                 display.innerText = '--%';
                 display.className = "text-7xl font-black text-gray-300 mt-2";
